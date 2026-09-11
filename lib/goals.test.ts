@@ -1,76 +1,65 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCallTaskPayload, buildRelayGoal, normaliseE164, resolveLocale, UNIT_RESULT_SCHEMA } from './goals.ts';
-import { newCase, grade, PRIORITY } from './triage.ts';
-import type { Unit } from './types.ts';
+import { buildIntakeTask, INTAKE_RESULT_SCHEMA, localeLanguage, maskE164, normaliseE164, resolveLocale } from './goals.ts';
+import { gradeIntake } from './triage.ts';
 
-const unit: Unit = { id: 'pcr-11', name: 'PCR Van 11', service: 'POLICE', e164: '+919999112011', baseArea: 'Rohini', ready: true };
-const c = newCase('KWR-0001', 'Meri mummy ko saans nahi aa rahi', 'Shalimar Bagh B-block');
-
-test('goal always frames the call as a relay of a human decision', () => {
-  const g = buildRelayGoal(c, unit);
-  assert.match(g, /human dispatcher has CONFIRMED/i);
-  assert.match(g, /ONLY to relay/i);
+test('task embeds the E.164 recipient and the conversation language', () => {
+  const t = buildIntakeTask('+918588077790', 'hi', 'PRA-1');
+  assert.match(t.task, /^Call \+918588077790 now\./);
+  assert.match(t.task, /practice intake in Hindi/);
 });
 
-test('goal contains hard safety constraints — never instructs the unit to move', () => {
-  const g = buildRelayGoal(c, unit);
-  assert.match(g, /Do NOT instruct, order, or pressure/i);
-  assert.match(g, /Do NOT create or change the dispatch decision/i);
-  assert.match(g, /never guess/i);
+test('task always self-identifies as an AI demo — never the real 112', () => {
+  const t = buildIntakeTask('+918588077790', 'hi', 'PRA-1');
+  assert.match(t.task, /AI demonstration and NOT the real 112/i);
+  assert.ok(!/you are (a|the) 112 operator/i.test(t.task), 'must never claim to be a 112 operator');
 });
 
-test('unit_accepted is tri-state; eta_minutes is free-form so numbers can come back', () => {
-  assert.deepEqual(UNIT_RESULT_SCHEMA.unit_accepted.enum, ['yes', 'no', 'unknown']);
-  assert.equal(UNIT_RESULT_SCHEMA.eta_minutes.enum, undefined, 'eta must not be enum-locked to unknown');
-  assert.match(UNIT_RESULT_SCHEMA.eta_minutes.description, /digits/);
-  assert.match(UNIT_RESULT_SCHEMA.eta_minutes.description, /unknown/);
+test('task carries the real-emergency escape hatch', () => {
+  const t = buildIntakeTask('+918588077790', 'hi', 'PRA-1');
+  assert.match(t.task, /hang up and dial the real emergency number 112/i);
 });
 
-test('policy block: single attempt, no voicemail, errors surface — never a silent retry', () => {
-  const p = buildCallTaskPayload(c, unit, 'REL-0001').policy;
-  assert.equal(p.maxAttempts, 1);
-  assert.equal(p.voicemail, 'do_not_leave');
-  assert.equal(p.onNotReady, 'error');
+test('task forbids dispatch, promises, and government impersonation', () => {
+  const t = buildIntakeTask('+918588077790', 'hi', 'PRA-1');
+  assert.match(t.task, /Do NOT dispatch anyone/i);
+  assert.match(t.task, /do NOT claim to be a government service/i);
 });
 
-test('payload targets the SDK recipient shape (E.164, region IN, locale hi, unit name)', () => {
-  const p = buildCallTaskPayload(c, unit, 'REL-0001');
-  assert.equal(p.recipient.phone, '+919999112011');
-  assert.equal(p.recipient.region, 'IN');
-  assert.equal(p.recipient.locale, 'hi');
-  assert.equal(p.recipient.name, 'PCR Van 11');
-  assert.deepEqual(p.metadata, { caseId: 'KWR-0001', unitId: 'pcr-11', relayId: 'REL-0001', product: 'kwik-relay' });
-  assert.equal(p.resultSchema, UNIT_RESULT_SCHEMA);
+test('intake schema: categorical fields enum-locked, phrase fields free-form', () => {
+  assert.deepEqual(INTAKE_RESULT_SCHEMA.urgency.enum, ['critical', 'high', 'medium', 'low', 'unknown']);
+  assert.deepEqual(INTAKE_RESULT_SCHEMA.caller_clarity.enum, ['clear', 'partial', 'unclear', 'unknown']);
+  assert.equal(INTAKE_RESULT_SCHEMA.emergency_type.enum, undefined);
+  assert.equal(INTAKE_RESULT_SCHEMA.location.enum, undefined);
 });
 
 test('PREVIEW and REAL are byte-identical from one builder', () => {
-  const a = buildCallTaskPayload(c, unit, 'REL-0002');
-  const b = buildCallTaskPayload(c, unit, 'REL-0002');
+  const a = buildIntakeTask('+918588077790', 'hi', 'PRA-2');
+  const b = buildIntakeTask('+918588077790', 'hi', 'PRA-2');
   assert.equal(JSON.stringify(a), JSON.stringify(b));
 });
 
-test('E.164 normalisation rejects junk', () => {
-  assert.equal(normaliseE164('+91 99991 12011'), '+919999112011');
-  assert.equal(normaliseE164('919999112011'), null);
-  assert.equal(normaliseE164('+91-999-'), null);
+test('E.164 normalisation and masking', () => {
+  assert.equal(normaliseE164('+91 98800 77790'), '+919880077790');
+  assert.equal(normaliseE164('918588077790'), null);
+  assert.equal(maskE164('+918588077790'), '+9185•••••790');
 });
 
-test('locale resolution falls back to en-IN for unsupported languages', () => {
+test('locale resolution and language naming', () => {
   assert.equal(resolveLocale('hi'), 'hi');
-  assert.equal(resolveLocale('ta'), 'ta');
-  assert.equal(resolveLocale('xx-unknown'), 'en-IN');
-  assert.equal(resolveLocale(undefined), 'hi');
+  assert.equal(resolveLocale('xx'), 'en-IN');
+  assert.equal(localeLanguage('hi'), 'Hindi');
+  assert.equal(localeLanguage('unknown-code'), 'Hindi');
 });
 
-test('intake rules grade breathing emergencies CRITICAL', () => {
-  const g = grade('saans nahi aa rahi behosh', 'x');
+test('grading maps urgency to severity and priority', () => {
+  assert.deepEqual(gradeIntake({ emergencyType: 'fire', location: 'x', urgency: 'medium', clarity: 'clear' }).severity, 'CRITICAL'); // content escalates
+  assert.equal(gradeIntake({ emergencyType: 'noise', location: 'x', urgency: 'low', clarity: 'clear' }).priority, 'P4');
+  assert.equal(gradeIntake({ emergencyType: 'none', location: 'unknown', urgency: 'unknown', clarity: 'unknown' }).severity, 'UNKNOWN');
+});
+
+test('grading can only escalate from the agent urgency, never downplay life-critical words', () => {
+  const g = gradeIntake({ emergencyType: 'person not breathing', location: 'home', urgency: 'low', clarity: 'partial' });
   assert.equal(g.severity, 'CRITICAL');
-  assert.equal(PRIORITY[g.severity], 'P1');
-  assert.equal(grade('noise complaint', 'x').severity, 'LOW');
-});
-
-test('case timeline starts with an INTAKE record', () => {
-  assert.equal(c.timeline[0].kind, 'INTAKE');
-  assert.match(c.timeline[0].detail, /CRITICAL/);
+  assert.equal(g.priority, 'P1');
 });

@@ -1,62 +1,60 @@
-// Goal + result-schema builder — the safety-critical core of Kwik Relay.
+// Intake task builder — the safety-critical core.
 //
-// Design contract (tested in goals.test.ts):
-//  1. The CALL-E agent only RELAYS a human-confirmed dispatch decision.
-//     It never decides, never dispatches on its own, and never instructs
-//     the unit to move — it asks for availability and ETA.
-//  2. The result schema is tri-state where the answer is categorical
-//     (yes/no/unknown) and free-form-string where the answer is a number
-//     (eta_minutes) — real calls are unpredictable; the console must always
-//     receive a predictable shape.
-//  3. PREVIEW and REAL build the byte-identical payload from one function.
-//  4. The policy block is single-attempt, no voicemail, no silent retry —
-//     matching the awesome-phone-call-agents review policy for live demos.
+// Contract (tested in goals.test.ts):
+//  1. The agent ALWAYS opens by identifying itself as an AI demonstration,
+//     NOT the real 112 — this line is what keeps the call honest.
+//  2. Real-emergency escape hatch: if the person reports a real ongoing
+//     emergency, the agent must tell them to hang up and dial the real
+//     emergency number.
+//  3. Intake only: never dispatch, never promise help, never claim to be a
+//     government service.
+//  4. Structured result: categorical fields tri-state-or-better; free-form
+//     strings for phrases.
+//  5. PREVIEW and REAL build the byte-identical payload from one function.
 
-import type { CallTaskPayload, EmergencyCase, Unit } from './types.ts';
+import type { CallTaskPayload } from './types.ts';
 
-export const UNIT_RESULT_SCHEMA: CallTaskPayload['resultSchema'] = {
-  unit_accepted: {
+export const INTAKE_RESULT_SCHEMA: CallTaskPayload['resultSchema'] = {
+  emergency_type: {
     type: 'string',
-    enum: ['yes', 'no', 'unknown'],
-    description: 'Can this unit respond to the relayed emergency assignment?',
+    description: 'One short phrase in English for the emergency the person described (for example "breathing emergency" or "road accident"). If nothing was described, return "none".',
   },
-  eta_minutes: {
+  location: {
     type: 'string',
-    description:
-      'Estimated arrival in minutes exactly as the unit stated it, as digits (for example "12"). If the unit did not state a time or the answer was unclear, return the word "unknown".',
+    description: 'The location exactly as the person stated it, as a short string. If no location was stated, return "unknown".',
   },
-  notes: {
+  urgency: {
     type: 'string',
-    description: 'One short sentence of anything else the unit said, in English.',
+    enum: ['critical', 'high', 'medium', 'low', 'unknown'],
+    description: 'Your assessment of the urgency of what the person described.',
+  },
+  caller_clarity: {
+    type: 'string',
+    enum: ['clear', 'partial', 'unclear', 'unknown'],
+    description: 'How clearly the person stated what happened and where.',
   },
 };
 
-export function buildRelayGoal(c: EmergencyCase, u: Unit): string {
-  return [
-    `You are Kwik Relay, the outbound dispatcher assistant for an emergency control room. A human dispatcher has CONFIRMED the following assignment. Your job is ONLY to relay it and collect the unit's answer.`,
-    `Incident: ${c.incidentType} (${c.severity}, ${c.priority}).`,
-    `Location: ${c.locationText}.`,
-    `Assign to: ${u.name} (${u.service}) based near ${u.baseArea}.`,
-    `Collect exactly two things: (1) can the unit respond to this assignment, (2) their estimated arrival time in minutes.`,
-    `Hard constraints: Do NOT instruct, order, or pressure the unit to move. Do NOT create or change the dispatch decision. Do NOT discuss other cases. If the line is unclear or the answer is uncertain, return "unknown" — never guess. Keep the call under two minutes. Identify yourself as calling on behalf of the emergency control room relay.`,
-  ].join(' ');
-}
+const LANGUAGE_NAME: Record<string, string> = {
+  hi: 'Hindi', 'en-IN': 'Indian English', ta: 'Tamil', te: 'Telugu', bn: 'Bengali',
+  mr: 'Marathi', pa: 'Punjabi', gu: 'Gujarati', kn: 'Kannada', ml: 'Malayalam',
+  as: 'Assamese', or: 'Odia',
+};
 
-export function buildCallTaskPayload(
-  c: EmergencyCase,
-  u: Unit,
-  relayId: string,
-  locale = process.env.CALLE_LOCALE ?? 'hi',
-  region = 'IN',
-): CallTaskPayload {
-  const phone = normaliseE164(u.e164);
-  if (!phone) throw new Error(`Unit ${u.id} has no valid E.164 number`);
+/** The task that CALL-E executes. The self-identification and escape lines
+ *  are load-bearing: this exact framing passed the provider's request safety
+ *  review in live testing (2026-09-11). Do not soften them. */
+export function buildIntakeTask(testerE164: string, locale: string, practiceId: string): CallTaskPayload {
   return {
-    task: buildRelayGoal(c, u),
-    recipient: { phone, region, locale, name: u.name },
-    resultSchema: UNIT_RESULT_SCHEMA,
-    policy: { maxAttempts: 1, voicemail: 'do_not_leave', onNotReady: 'error' },
-    metadata: { caseId: c.id, unitId: u.id, relayId, product: 'kwik-relay' },
+    task: [
+      `Call ${testerE164} now.`,
+      `You are Kwik, a DEMO emergency-call intake simulator built for a hackathon. The person who answers is the developer who built you, testing the system — they will play the role of a citizen reporting an emergency.`,
+      `SAFETY FIRST: Begin the call by clearly stating, in ${LANGUAGE_NAME[locale] ?? 'Hindi'}, that you are an AI demonstration and NOT the real 112 emergency service. If at any point the person indicates a real ongoing emergency, immediately tell them to hang up and dial the real emergency number 112.`,
+      `Then run the practice intake in ${LANGUAGE_NAME[locale] ?? 'Hindi'}: ask (1) what happened, (2) where they are, (3) how urgent it is. Ask one question at a time, be calm and reassuring, and confirm the location back to them before finishing. Keep the practice call under three minutes.`,
+      `Do NOT dispatch anyone, do NOT promise help is coming, do NOT claim to be a government service. This is a simulation of intake only.`,
+    ].join(' '),
+    resultSchema: INTAKE_RESULT_SCHEMA,
+    metadata: { practiceId, product: 'kwik' },
   };
 }
 
@@ -66,9 +64,15 @@ export function normaliseE164(input: string): string | null {
   return E164_RE.test(t) ? t : null;
 }
 
-/** Map a spoken-language preference to a CALL-E locale, falling back safely. */
+export function maskE164(input: string): string {
+  return input.slice(0, 5) + '•••••' + input.slice(-3);
+}
+
 export const SUPPORTED_LOCALES = ['hi', 'en-IN', 'ta', 'te', 'bn', 'mr', 'pa', 'gu', 'kn', 'ml', 'as', 'or'] as const;
 export function resolveLocale(requested?: string): string {
   if (!requested) return 'hi';
   return (SUPPORTED_LOCALES as readonly string[]).includes(requested) ? requested : 'en-IN';
+}
+export function localeLanguage(locale: string): string {
+  return LANGUAGE_NAME[locale] ?? 'Hindi';
 }

@@ -1,26 +1,31 @@
-// CALL-E adapter. One isolated place where the SDK is imported — the rest of
-// the app talks to this module. Two-phase flow per the SDK surface:
-//   createRelayCall()  → client.calls.create(input, { idempotencyKey })  (fast)
-//   fetchRelayCall()   → client.calls.get(callId)                        (poll)
+// CALL-E adapter — one isolated place that talks to the provider.
+// Uses the public REST API directly (api.heycall-e.com/v1/calls) because the
+// live endpoint's accepted fields (task with embedded E.164 + result_schema
+// + metadata) are narrower than the SDK's typed surface, which the server
+// rejects as extra_forbidden. Verified against production 2026-09-11.
 //
-// Policy: single attempt, no voicemail, errors surface — never a silent retry
-// (see lib/goals.ts policy block and the awesome-phone-call-agents review
-// policy for live-capable demos).
+// Flow: createRelayCall() → POST /v1/calls (fast, returns id)
+//       fetchRelayCall()  → GET  /v1/calls/{id}  (poll)
+//
+// Single attempt: we never retry automatically — an ambiguous or failed call
+// returns to the human coordinator (see review policy: no auto-redial).
 //
 // Env (server-side only):
-//   CALLE_API_KEY  — required for REAL calls. Never exposed to the client.
-//   CALLE_LOCALE   — default conversation locale for units ('hi').
+//   CALLE_API_KEY   required for REAL calls. Never exposed to the client.
+//   CALLE_BASE_URL  optional override (default https://api.heycall-e.com)
+//   CALLE_LOCALE    default conversation language ('hi')
 
-import type { RelayRecord } from './types.ts';
+import type { IntakeResult, PracticeCall } from './types.ts';
+
+const BASE = () => process.env.CALLE_BASE_URL ?? 'https://api.heycall-e.com';
 
 export type ProviderPhase = 'IN_FLIGHT' | 'DONE' | 'FAILED';
 
 export interface ProviderPoll {
   phase: ProviderPhase;
   calleStatus: string | null;
-  result: RelayRecord['result'];
-  resultValidation: string | null;
-  transcriptExcerpt: string | null;
+  result: IntakeResult | null;
+  summary: string | null;
   failure: string | null;
 }
 
@@ -28,72 +33,80 @@ export function calleConfigured(): boolean {
   return Boolean(process.env.CALLE_API_KEY);
 }
 
-async function client() {
-  if (!process.env.CALLE_API_KEY) throw new Error('CALLE_API_KEY is not set on the server.');
-  const mod = (await import('@call-e/calle')) as { CalleClient: new (o: { apiKey: string }) => any };
-  return new mod.CalleClient({ apiKey: process.env.CALLE_API_KEY });
+function authHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    Authorization: `Bearer ${process.env.CALLE_API_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  };
 }
 
-function normaliseResult(raw: unknown): RelayRecord['result'] {
+function normaliseIntake(raw: unknown): IntakeResult {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const accepted = String(r.unit_accepted ?? 'unknown').toLowerCase();
-  const etaRaw = r.eta_minutes ?? 'unknown';
-  const eta = etaRaw === null || etaRaw === undefined || String(etaRaw).trim() === ''
-    ? 'unknown'
-    : String(etaRaw).trim();
+  const urgency = String(r.urgency ?? 'unknown').toLowerCase();
+  const clarity = String(r.caller_clarity ?? 'unknown').toLowerCase();
   return {
-    unitAccepted: accepted === 'yes' || accepted === 'no' ? accepted : 'unknown',
-    etaMinutes: eta,
-    notes: String(r.notes ?? '').slice(0, 300),
+    emergencyType: String(r.emergency_type ?? 'none').slice(0, 120) || 'none',
+    location: String(r.location ?? 'unknown').slice(0, 160) || 'unknown',
+    urgency: (['critical','high','medium','low','unknown'] as const).includes(urgency as never) ? urgency as IntakeResult['urgency'] : 'unknown',
+    clarity: (['clear','partial','unclear','unknown'] as const).includes(clarity as never) ? clarity as IntakeResult['clarity'] : 'unknown',
   };
+}
+
+/** Submit the call. Returns the provider call id immediately — the call runs
+ *  asynchronously; poll with fetchRelayCall. */
+export async function createCall(record: PracticeCall): Promise<{ callId: string }> {
+  const res = await fetch(`${BASE()}/v1/calls`, {
+    method: 'POST',
+    headers: authHeaders({ 'Idempotency-Key': `kwik-relay-${record.id}` }),
+    body: JSON.stringify({
+      task: record.payload.task,
+      result_schema: record.payload.resultSchema,
+      metadata: record.payload.metadata,
+    }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (body as any)?.error?.message ?? `CALL-E create failed (HTTP ${res.status})`;
+    throw new Error(msg);
+  }
+  const id = (body as any)?.id;
+  if (!id) throw new Error('CALL-E did not return a call id.');
+  return { callId: String(id) };
 }
 
 const TERMINAL_OK = new Set(['completed', 'complete', 'succeeded', 'success', 'done']);
 const TERMINAL_BAD = new Set(['failed', 'error', 'canceled', 'cancelled', 'expired']);
 
-function phaseOf(status: string, failureCode: string | null): ProviderPhase {
-  const s = status.toLowerCase();
-  if (TERMINAL_BAD.has(s) || failureCode) return 'FAILED';
-  if (TERMINAL_OK.has(s)) return 'DONE';
-  return 'IN_FLIGHT';
-}
-
-/** Submit the call. Returns the provider call id immediately — the call runs
- *  asynchronously; poll with fetchRelayCall. */
-export async function createRelayCall(record: RelayRecord): Promise<{ callId: string }> {
-  const c = await client();
-  const call = await c.calls.create(
-    {
-      task: record.payload.task,
-      recipient: record.payload.recipient,
-      resultSchema: record.payload.resultSchema,
-      policy: record.payload.policy,
-      metadata: record.payload.metadata,
-    },
-    // Stable dedupe key: replaying the same relay cannot double-call.
-    { idempotencyKey: `kwik-relay-${record.id}` },
-  );
-  if (!call?.id) throw new Error('CALL-E did not return a call id.');
-  return { callId: call.id };
-}
-
-/** Poll an in-flight call once. */
-export async function fetchRelayCall(callId: string): Promise<ProviderPoll> {
-  const c = await client();
-  const call = await c.calls.get(callId);
-  const status = typeof call?.status === 'string' ? call.status : 'unknown';
-  const failureCode = call?.failureCode ?? null;
-  const phase = phaseOf(status, failureCode);
+/** Poll an in-flight call once. Tolerant of top-level and per-recipient fields. */
+export async function fetchCall(callId: string): Promise<ProviderPoll> {
+  const res = await fetch(`${BASE()}/v1/calls/${encodeURIComponent(callId)}`, {
+    headers: authHeaders(),
+  });
+  const call = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = (call as any)?.error?.message ?? `CALL-E get failed (HTTP ${res.status})`;
+    throw new Error(msg);
+  }
+  const c = call as Record<string, any>;
+  const status = typeof c.status === 'string' ? c.status : 'unknown';
+  const recipients = Array.isArray(c.recipients) ? c.recipients : [];
+  const r0 = recipients[0] ?? {};
+  const failureCode = c.failure_code ?? r0.failure_code ?? null;
+  const phase: ProviderPhase = TERMINAL_BAD.has(status.toLowerCase()) || failureCode
+    ? 'FAILED'
+    : TERMINAL_OK.has(status.toLowerCase())
+      ? 'DONE'
+      : 'IN_FLIGHT';
+  const structured = c.structured_result ?? r0.structured_result ?? null;
+  const summary = [r0.summary, c.summary].filter((x) => typeof x === 'string' && x.length).join(' ') || null;
   return {
     phase,
     calleStatus: status,
-    result: phase === 'DONE' ? normaliseResult(call?.structuredResult) : null,
-    resultValidation:
-      call?.resultValidation != null ? String(JSON.stringify(call.resultValidation)).slice(0, 120) : null,
-    transcriptExcerpt:
-      typeof call?.transcript === 'string' && call.transcript.length
-        ? call.transcript.slice(0, 280)
-        : null,
-    failure: failureCode ? `${failureCode}${call?.failureMessage ? `: ${call.failureMessage}` : ''}` : null,
+    result: phase === 'DONE' ? normaliseIntake(structured) : null,
+    summary: summary ? summary.slice(0, 400) : null,
+    failure: failureCode
+      ? `${failureCode}${summary ? `: ${summary.slice(0, 160)}` : ''}`
+      : phase === 'FAILED' ? 'provider reported failure' : null,
   };
 }
