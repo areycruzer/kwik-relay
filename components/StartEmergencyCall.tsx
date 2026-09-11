@@ -736,19 +736,22 @@ function CallStation({
    */
   const startCalleDemo = useCallback(async () => {
     if (!callePinRef.current.trim()) {
-      setErrorText('Enter the operator PIN to place a real demo call.');
+      setErrorText('Enter the demo PIN to place a real demo call.');
       setPhase('error');
       return;
     }
-    const usingOwnNumber = callePhoneRef.current.trim().length > 0;
-    if (usingOwnNumber && !calleConsentRef.current) {
+    if (!callePhoneRef.current.trim()) {
+      setErrorText('Enter your own phone number — the demo call rings it. There is no default demo phone.');
+      setPhase('error');
+      return;
+    }
+    if (!calleConsentRef.current) {
       setErrorText('Tick the consent box — the number must be yours, or its owner must have agreed.');
       setPhase('error');
       return;
     }
-    const target = usingOwnNumber ? `your number (${callePhoneRef.current.trim()})` : 'the configured demo phone';
     const ok = window.confirm(
-      `Place ONE real demo call via CALL-E to ${target}?\n\n` +
+      `Place ONE real demo call via CALL-E to your number (${callePhoneRef.current.trim()})?\n\n` +
         '• The AI will identify itself as a DEMO — it never claims to be the real 112.\n' +
         '• Single attempt — no auto-redial. Once submitted it cannot be recalled.\n' +
         '• Answer the phone and report a practice emergency in Hindi.',
@@ -779,7 +782,8 @@ function CallStation({
         body: JSON.stringify({
           mode: 'REAL',
           locale: 'hi',
-          ...(usingOwnNumber ? { phone: callePhoneRef.current.trim(), consent: calleConsentRef.current } : {}),
+          phone: callePhoneRef.current.trim(),
+          consent: calleConsentRef.current,
         }),
       });
       const data = await res.json();
@@ -970,7 +974,7 @@ function CallStation({
                   <span className="text-2xs text-ink-4">public demo PIN: 3053</span>
                 </div>
                 <div className="space-y-1.5">
-                  <label htmlFor="calle-phone" className="label block">Your phone (optional — get the call yourself)</label>
+                  <label htmlFor="calle-phone" className="label block">Your phone number — the demo call rings it</label>
                   <input
                     id="calle-phone"
                     type="tel"

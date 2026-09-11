@@ -3,9 +3,11 @@
  *
  *   POST /api/callee-demo  { mode, locale?, phone?, consent? }  + x-demo-pin for REAL
  *     PREVIEW → returns the exact task text; no network, no call.
- *     REAL    → guards (operator PIN, consent, per-number cooldown, budget)
+ *     REAL    → requires the visitor's OWN phone (E.164) + consent checkbox;
+ *               guards (operator PIN, per-number cooldown, budget)
  *               → places ONE CALL-E call → returns { practiceId, callId }.
- *               phone is optional: defaults to the server's TESTER_NUMBER.
+ *               There is no default target: nobody can burn credits on a
+ *               number they did not supply and attest to.
  *
  *   GET  /api/callee-demo?callId=<id>  → one provider poll.
  *   GET  /api/callee-demo?meta=1       → live budget window + tester info.
@@ -69,22 +71,21 @@ export async function POST(req: Request) {
   const mode = body?.mode === 'REAL' ? 'REAL' : 'PREVIEW';
   const locale = typeof body?.locale === 'string' ? body.locale : 'hi';
   const pin = String(req.headers.get('x-demo-pin') ?? '');
-  const customPhone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+  const visitorPhone = typeof body?.phone === 'string' ? body.phone.trim() : '';
   const consent = body?.consent === true;
 
+  // PREVIEW may show the task with the configured demo number as an example;
+  // REAL calls only ever ring a number the visitor supplied and attested to.
   const tester = normaliseE164(process.env.TESTER_NUMBER ?? '');
   let phone = tester;
   let phoneIsCustom = false;
-  if (customPhone) {
-    const normalised = normaliseE164(customPhone);
+  if (visitorPhone) {
+    const normalised = normaliseE164(visitorPhone);
     if (!normalised) {
       return NextResponse.json({ error: 'Enter a valid E.164 phone number (for example +919876543210).', code: 'PHONE' }, { status: 400 });
     }
     phone = normalised;
     phoneIsCustom = true;
-  }
-  if (!phone) {
-    return NextResponse.json({ error: 'TESTER_NUMBER (E.164) is not configured on the server.', code: 'PROVIDER' }, { status: 503 });
   }
 
   const practiceId = `PRA-${Date.now().toString(36).toUpperCase()}`;
@@ -94,9 +95,15 @@ export async function POST(req: Request) {
     return NextResponse.json({
       task,
       warning: 'PREVIEW only — no phone call was placed.',
-      phoneMasked: maskE164(phone),
+      phoneMasked: phone ? maskE164(phone) : null,
       language: localeLanguage(locale),
     });
+  }
+
+  // REAL: the visitor's own number is mandatory — there is no default target,
+  // so nobody can spend the account's credits on someone else's behalf.
+  if (!phoneIsCustom) {
+    return NextResponse.json({ error: 'Enter your own phone number to receive the demo call — there is no default demo phone.', code: 'PHONE_REQUIRED' }, { status: 400 });
   }
 
   const expectedPin = process.env.DEMO_PIN;
@@ -106,7 +113,7 @@ export async function POST(req: Request) {
   if (pin !== expectedPin) {
     return NextResponse.json({ error: 'Invalid demo PIN.', code: 'PIN' }, { status: 401 });
   }
-  if (phoneIsCustom && !consent) {
+  if (!consent) {
     return NextResponse.json({ error: 'Tick the consent box: the number must be yours or its owner must have agreed to receive this demo call.', code: 'CONSENT' }, { status: 400 });
   }
   if (!calleConfigured()) {
@@ -129,7 +136,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       practiceId,
       callId,
-      phoneMasked: maskE164(phone),
+      phoneMasked: maskE164(phone!),
       language: localeLanguage(locale),
       budgetRemaining: budgetRemaining(),
       notice: 'Call submitted — single attempt, cannot be recalled once placed. Poll for the structured intake.',
