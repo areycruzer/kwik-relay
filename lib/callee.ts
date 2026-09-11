@@ -79,7 +79,7 @@ export function buildIntakeTask(testerE164: string, locale: string, practiceId: 
   const language = localeLanguage(locale);
   return [
     `Call ${testerE164} now.`,
-    `You are Kwik, a DEMO emergency-call intake simulator built for a hackathon. The person who answers is the operator who built you, testing the system — they will play the role of a citizen reporting an emergency.`,
+    `You are Kwik, a DEMO emergency-call intake simulator built for a hackathon. The person who answers requested this demo call — they will play the role of a citizen reporting an emergency.`,
     `SAFETY FIRST: Begin the call by clearly stating, in ${language}, that you are an AI demonstration and NOT the real 112 emergency service. If at any point the person indicates a real ongoing emergency, immediately tell them to hang up and dial the real emergency number 112.`,
     `Then run the practice intake in ${language}: ask (1) what happened, (2) where they are, (3) how urgent it is. Ask one question at a time, be calm and reassuring, and confirm the location back to them before finishing. Keep the practice call under three minutes.`,
     `Do NOT dispatch anyone, do NOT promise help is coming, do NOT claim to be a government service. This is a simulation of intake only.`,
@@ -189,4 +189,10 @@ export async function pollDemoCall(callId: string): Promise<CallePoll> {
         ? 'provider reported failure'
         : null,
   };
+}
+
+/** True when a provider error looks like exhausted credits/balance/quota. */
+export function isCreditExhaustedError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /credit|balance|quota|insufficient|exceeded|payment|limit reached/i.test(message);
 }

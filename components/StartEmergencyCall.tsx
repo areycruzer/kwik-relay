@@ -226,6 +226,15 @@ function CallStation({
   );
   const [calleNote, setCalleNote] = useState<string | null>(null);
   const callePinRef = useRef('');
+  // Public testing: visitor's own number, consent, live budget, fallback popup.
+  const [callePhone, setCallePhone] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem('kwik_calle_phone') ?? '' : ''),
+  );
+  const [calleConsent, setCalleConsent] = useState(false);
+  const [calleBudget, setCalleBudget] = useState<{ remaining: number; max: number } | null>(null);
+  const [calleFallback, setCalleFallback] = useState<string | null>(null);
+  const callePhoneRef = useRef(callePhone);
+  const calleConsentRef = useRef(false);
   const startedAt = useRef<number>(0);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const liveCallIdRef = useRef<string | null>(null);
@@ -731,11 +740,18 @@ function CallStation({
       setPhase('error');
       return;
     }
+    const usingOwnNumber = callePhoneRef.current.trim().length > 0;
+    if (usingOwnNumber && !calleConsentRef.current) {
+      setErrorText('Tick the consent box — the number must be yours, or its owner must have agreed.');
+      setPhase('error');
+      return;
+    }
+    const target = usingOwnNumber ? `your number (${callePhoneRef.current.trim()})` : 'the configured demo phone';
     const ok = window.confirm(
-      'Place ONE real demo call via CALL-E?\n\n' +
+      `Place ONE real demo call via CALL-E to ${target}?\n\n` +
         '• The AI will identify itself as a DEMO — it never claims to be the real 112.\n' +
         '• Single attempt — no auto-redial. Once submitted it cannot be recalled.\n' +
-        '• Answer your phone and report a practice emergency in Hindi.',
+        '• Answer the phone and report a practice emergency in Hindi.',
     );
     if (!ok) return;
 
@@ -755,15 +771,37 @@ function CallStation({
     setPhase('scripted');
     setCalleNote('Submitting demo call via CALL-E…');
 
-    let submit: { practiceId: string; callId: string; testerMasked: string };
+    let submit: { practiceId: string; callId: string; phoneMasked: string };
     try {
       const res = await fetch('/api/callee-demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-demo-pin': callePinRef.current.trim() },
-        body: JSON.stringify({ mode: 'REAL', locale: 'hi' }),
+        body: JSON.stringify({
+          mode: 'REAL',
+          locale: 'hi',
+          ...(usingOwnNumber ? { phone: callePhoneRef.current.trim(), consent: calleConsentRef.current } : {}),
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'The demo call could not be placed.');
+      if (!res.ok) {
+        // Credits/budget exhausted → auto-fallback to the scripted caller + popup.
+        if (data.code === 'CREDITS' || data.code === 'BUDGET' || data.code === 'NUMBER_COOLDOWN') {
+          publishLiveCallEvent('end', [], 'simulated', 'hi');
+          setSessionKind(null);
+          setCalleNote(null);
+          setCalleFallback(
+            data.code === 'NUMBER_COOLDOWN'
+              ? `This number received a demo call recently. The scripted caller is running instead — the same triage pipeline, labeled SIMULATED.`
+              : `Live demo-call credits are exhausted right now. The scripted caller is running automatically instead — the same triage pipeline, labeled SIMULATED.`,
+          );
+          runScript();
+          return;
+        }
+        throw new Error(data.error || 'The demo call could not be placed.');
+      }
+      if (typeof data.budgetRemaining === 'number') {
+        setCalleBudget({ remaining: data.budgetRemaining, max: calleBudget?.max ?? 6 });
+      }
       submit = data;
     } catch (error) {
       publishLiveCallEvent('end', [], 'simulated', 'hi');
@@ -774,7 +812,7 @@ function CallStation({
       return;
     }
 
-    setCalleNote(`📞 Demo call in flight to ${submit.testerMasked} — answer your phone. Polling every 4s…`);
+    setCalleNote(`📞 Demo call in flight to ${submit.phoneMasked} — answer your phone. Polling every 4s…`);
 
     const finish = (poll: { result?: { emergencyType: string; location: string; urgency: string; clarity: string }; summary?: string | null; failure?: string | null }) => {
       const language = 'hi';
@@ -807,7 +845,7 @@ function CallStation({
         const seconds = Math.max(1, Math.round((Date.now() - startedAt.current) / 1000));
         publishLiveCallEvent('end', built, 'simulated', language);
         setCalleNote(null);
-        void triageAndPublish(submit.testerMasked, built, frames.slice(0, built.length), seconds, 'simulated', language);
+        void triageAndPublish(submit.phoneMasked, built, frames.slice(0, built.length), seconds, 'simulated', language);
       }, 1500);
       scriptTimersRef.current.push(done);
     };
@@ -843,7 +881,18 @@ function CallStation({
     };
     const first = setTimeout(() => void tick(), 5000);
     scriptTimersRef.current.push(first);
-  }, [beginLiveCallEvent, publishLiveCallEvent, triageAndPublish, clearScriptTimers]);
+  }, [beginLiveCallEvent, publishLiveCallEvent, triageAndPublish, clearScriptTimers, runScript, calleBudget]);
+
+  // Live budget for the public demo-call panel.
+  useEffect(() => {
+    if (phase !== 'idle' && phase !== 'error') return;
+    fetch('/api/callee-demo?meta=1', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((m) => {
+        if (typeof m?.budgetRemaining === 'number') setCalleBudget({ remaining: m.budgetRemaining, max: m.budgetMax ?? 6 });
+      })
+      .catch(() => {});
+  }, [phase]);
 
   const mmss = `${String(Math.floor(duration / 60)).padStart(2, '0')}:${String(duration % 60).padStart(2, '0')}`;
   const goldenGrade = useMemo(() => scriptId === 'golden' ? buildLiveCallPayload({
@@ -905,19 +954,53 @@ function CallStation({
                   A real outbound call · AI identifies itself as a demo, never the real 112 · Hindi
                 </p>
                 <div className="flex items-center gap-2">
-                  <label htmlFor="calle-pin" className="label shrink-0">Operator PIN</label>
+                  <label htmlFor="calle-pin" className="label shrink-0">Demo PIN</label>
                   <input
                     id="calle-pin"
-                    type="password"
+                    type="text"
                     value={callePin}
                     onChange={(e) => {
                       setCallePin(e.target.value);
                       callePinRef.current = e.target.value;
                       if (typeof window !== 'undefined') sessionStorage.setItem('kwik_calle_pin', e.target.value);
                     }}
-                    placeholder="••••"
-                    className="w-24 rounded-md border border-rule-strong bg-deep px-2 py-1.5 text-sm text-ink-2 focus:border-accent focus:outline-none"
+                    placeholder="3053"
+                    className="w-20 rounded-md border border-rule-strong bg-deep px-2 py-1.5 text-sm text-ink-2 focus:border-accent focus:outline-none"
                   />
+                  <span className="text-2xs text-ink-4">public demo PIN: 3053</span>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="calle-phone" className="label block">Your phone (optional — get the call yourself)</label>
+                  <input
+                    id="calle-phone"
+                    type="tel"
+                    value={callePhone}
+                    onChange={(e) => {
+                      setCallePhone(e.target.value);
+                      callePhoneRef.current = e.target.value;
+                      if (typeof window !== 'undefined') localStorage.setItem('kwik_calle_phone', e.target.value);
+                    }}
+                    placeholder="+919876543210"
+                    className="w-full rounded-md border border-rule-strong bg-deep px-2 py-1.5 text-sm text-ink-2 focus:border-accent focus:outline-none"
+                  />
+                  <label className="flex items-start gap-2 text-2xs leading-relaxed text-ink-3">
+                    <input
+                      type="checkbox"
+                      checked={calleConsent}
+                      onChange={(e) => {
+                        setCalleConsent(e.target.checked);
+                        calleConsentRef.current = e.target.checked;
+                      }}
+                      className="mt-0.5"
+                    />
+                    This number is mine, or its owner has agreed to receive one AI demo call that identifies itself as a demo.
+                  </label>
+                  {calleBudget && (
+                    <p className="text-2xs text-ink-4">
+                      Live demo budget: {calleBudget.remaining} of {calleBudget.max} calls left this window · CALL-E trial
+                      credits are finite — when they run out, the scripted caller runs automatically.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2 border-t border-rule pt-3">
@@ -947,6 +1030,21 @@ function CallStation({
                 </div>
               </>
             ) : null}
+
+            {calleFallback && (
+              <div role="alert" className="flex items-start justify-between gap-3 rounded-md border border-accent/50 bg-accent/15 px-3 py-2.5">
+                <p className="text-xs leading-relaxed text-ink-2">
+                  <span className="font-bold">Auto-fallback:</span> {calleFallback}
+                </p>
+                <button
+                  onClick={() => setCalleFallback(null)}
+                  aria-label="Dismiss fallback notice"
+                  className="shrink-0 rounded p-1 text-ink-3 hover:text-ink"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
             {calleNote && (
               <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs leading-relaxed text-ink-2" role="status">
