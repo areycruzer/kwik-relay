@@ -20,17 +20,26 @@ test('goal contains hard safety constraints — never instructs the unit to move
   assert.match(g, /never guess/i);
 });
 
-test('result schema is tri-state and predictable', () => {
+test('unit_accepted is tri-state; eta_minutes is free-form so numbers can come back', () => {
   assert.deepEqual(UNIT_RESULT_SCHEMA.unit_accepted.enum, ['yes', 'no', 'unknown']);
-  assert.equal(UNIT_RESULT_SCHEMA.eta_minutes.type, 'string');
-  assert.ok(UNIT_RESULT_SCHEMA.notes.description.length > 0);
+  assert.equal(UNIT_RESULT_SCHEMA.eta_minutes.enum, undefined, 'eta must not be enum-locked to unknown');
+  assert.match(UNIT_RESULT_SCHEMA.eta_minutes.description, /digits/);
+  assert.match(UNIT_RESULT_SCHEMA.eta_minutes.description, /unknown/);
 });
 
-test('payload uses E.164, region IN, locale hi, and carries audit metadata', () => {
+test('policy block: single attempt, no voicemail, errors surface — never a silent retry', () => {
+  const p = buildCallTaskPayload(c, unit, 'REL-0001').policy;
+  assert.equal(p.maxAttempts, 1);
+  assert.equal(p.voicemail, 'do_not_leave');
+  assert.equal(p.onNotReady, 'error');
+});
+
+test('payload targets the SDK recipient shape (E.164, region IN, locale hi, unit name)', () => {
   const p = buildCallTaskPayload(c, unit, 'REL-0001');
-  assert.equal(p.phones[0], '+919999112011');
-  assert.equal(p.region, 'IN');
-  assert.equal(p.locale, 'hi');
+  assert.equal(p.recipient.phone, '+919999112011');
+  assert.equal(p.recipient.region, 'IN');
+  assert.equal(p.recipient.locale, 'hi');
+  assert.equal(p.recipient.name, 'PCR Van 11');
   assert.deepEqual(p.metadata, { caseId: 'KWR-0001', unitId: 'pcr-11', relayId: 'REL-0001', product: 'kwik-relay' });
   assert.equal(p.resultSchema, UNIT_RESULT_SCHEMA);
 });

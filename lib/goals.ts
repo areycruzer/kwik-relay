@@ -4,9 +4,13 @@
 //  1. The CALL-E agent only RELAYS a human-confirmed dispatch decision.
 //     It never decides, never dispatches on its own, and never instructs
 //     the unit to move — it asks for availability and ETA.
-//  2. The result schema is tri-state (yes / no / unknown) — real calls are
-//     unpredictable; the console must always receive a predictable shape.
+//  2. The result schema is tri-state where the answer is categorical
+//     (yes/no/unknown) and free-form-string where the answer is a number
+//     (eta_minutes) — real calls are unpredictable; the console must always
+//     receive a predictable shape.
 //  3. PREVIEW and REAL build the byte-identical payload from one function.
+//  4. The policy block is single-attempt, no voicemail, no silent retry —
+//     matching the awesome-phone-call-agents review policy for live demos.
 
 import type { CallTaskPayload, EmergencyCase, Unit } from './types.ts';
 
@@ -18,9 +22,8 @@ export const UNIT_RESULT_SCHEMA: CallTaskPayload['resultSchema'] = {
   },
   eta_minutes: {
     type: 'string',
-    enum: ['unknown'],
     description:
-      'Estimated arrival time in minutes as stated by the unit. Use the number if stated, else "unknown".',
+      'Estimated arrival in minutes exactly as the unit stated it, as digits (for example "12"). If the unit did not state a time or the answer was unclear, return the word "unknown".',
   },
   notes: {
     type: 'string',
@@ -46,14 +49,13 @@ export function buildCallTaskPayload(
   locale = process.env.CALLE_LOCALE ?? 'hi',
   region = 'IN',
 ): CallTaskPayload {
-  const e164 = normaliseE164(u.e164);
-  if (!e164) throw new Error(`Unit ${u.id} has no valid E.164 number`);
+  const phone = normaliseE164(u.e164);
+  if (!phone) throw new Error(`Unit ${u.id} has no valid E.164 number`);
   return {
     task: buildRelayGoal(c, u),
-    phones: [e164],
-    region,
-    locale,
+    recipient: { phone, region, locale, name: u.name },
     resultSchema: UNIT_RESULT_SCHEMA,
+    policy: { maxAttempts: 1, voicemail: 'do_not_leave', onNotReady: 'error' },
     metadata: { caseId: c.id, unitId: u.id, relayId, product: 'kwik-relay' },
   };
 }
