@@ -89,13 +89,19 @@ export async function POST(req: Request) {
   }
 
   const practiceId = `PRA-${Date.now().toString(36).toUpperCase()}`;
-  const task = buildIntakeTask(phone, locale, practiceId);
+  // Preview needs an example number to render the task; if the visitor gave
+  // none, fall back to the configured demo number purely for display.
+  const displayPhone = phone ?? normaliseE164(process.env.TESTER_NUMBER ?? '');
+  if (!displayPhone) {
+    return NextResponse.json({ error: 'TESTER_NUMBER (E.164) is not configured for the preview example.', code: 'PROVIDER' }, { status: 503 });
+  }
+  const task = buildIntakeTask(displayPhone, locale, practiceId);
 
   if (mode === 'PREVIEW') {
     return NextResponse.json({
       task,
       warning: 'PREVIEW only — no phone call was placed.',
-      phoneMasked: phone ? maskE164(phone) : null,
+      phoneMasked: maskE164(displayPhone),
       language: localeLanguage(locale),
     });
   }
@@ -122,7 +128,8 @@ export async function POST(req: Request) {
   if (budgetRemaining() <= 0) {
     return NextResponse.json({ error: 'Live demo budget reached for this window. The scripted demo runs the same pipeline.', code: 'BUDGET' }, { status: 429 });
   }
-  const lastForNumber = numberLastCall.get(phone);
+  const realPhone = phone as string; // non-null: PHONE_REQUIRED guard above
+  const lastForNumber = numberLastCall.get(realPhone);
   if (lastForNumber && Date.now() - lastForNumber < NUMBER_COOLDOWN_MS) {
     const mins = Math.ceil((NUMBER_COOLDOWN_MS - (Date.now() - lastForNumber)) / 60000);
     return NextResponse.json({ error: `This number received a demo call recently — try again in ~${mins} min, or run the scripted demo.`, code: 'NUMBER_COOLDOWN' }, { status: 429 });
@@ -131,12 +138,12 @@ export async function POST(req: Request) {
   try {
     const { callId } = await createDemoCall(task, practiceId);
     realCallTimes.push(Date.now());
-    numberLastCall.set(phone, Date.now());
+    numberLastCall.set(realPhone, Date.now());
     logger.info('calle demo call placed', { practiceId, callId, custom: phoneIsCustom });
     return NextResponse.json({
       practiceId,
       callId,
-      phoneMasked: maskE164(phone!),
+      phoneMasked: maskE164(realPhone),
       language: localeLanguage(locale),
       budgetRemaining: budgetRemaining(),
       notice: 'Call submitted — single attempt, cannot be recalled once placed. Poll for the structured intake.',
