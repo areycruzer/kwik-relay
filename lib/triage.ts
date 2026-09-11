@@ -1,43 +1,31 @@
-// Deterministic intake rules (subset of the Kwik 112 triage engine, kept
-// intentionally small: inbound intake is context for the CALL-E relay loop,
-// not the point of this product). Rules run before anything else; the relay
-// layer can never contradict them.
+// Deterministic local rules: turn a structured intake result into the
+// severity/priority a human control room would see. Rules run locally;
+// the phone agent's assessment is input, never the final word.
 
-import type { EmergencyCase, PriorityCode, Severity } from './types.ts';
+import type { IntakeResult, PriorityCode, Severity } from './types.ts';
 
-interface Rule { pattern: RegExp; type: string; severity: Severity }
-
-const RULES: Rule[] = [
-  { pattern: /\b(saans|breath|pulse|cardiac|heart attack|dil|unconscious|behosh)\b/i, type: 'Cardiac / breathing emergency', severity: 'CRITICAL' },
-  { pattern: /\b(accident|tod|crash|khoon|bleeding|injur|road)\b/i, type: 'Road accident / trauma', severity: 'CRITICAL' },
-  { pattern: /\b(fire|aag|smoke|jal)\b/i, type: 'Fire', severity: 'CRITICAL' },
-  { pattern: /\b(theft|chor|assault|threat)\b/i, type: 'Police matter', severity: 'HIGH' },
-  { pattern: /\b(fever|clinic|hospital visit|medicine)\b/i, type: 'Medical (non-urgent)', severity: 'MEDIUM' },
-  { pattern: /\b(noise|complaint|query|information)\b/i, type: 'Routine information', severity: 'LOW' },
-];
-
-export const PRIORITY: Record<Severity, PriorityCode> = {
-  CRITICAL: 'P1', HIGH: 'P2', MEDIUM: 'P3', LOW: 'P4',
+const URGENCY_SEVERITY: Record<string, Severity> = {
+  critical: 'CRITICAL', high: 'HIGH', medium: 'MEDIUM', low: 'LOW', unknown: 'UNKNOWN',
 };
 
-export function grade(callerPhrase: string, locationText: string): { incidentType: string; severity: Severity } {
-  const hit = RULES.find((r) => r.pattern.test(callerPhrase));
-  return { incidentType: hit?.type ?? 'Unclassified call', severity: hit?.severity ?? 'LOW' };
-}
+/** Content can only escalate, never de-escalate: a caller whose words match
+ *  life-critical patterns is CRITICAL regardless of a calmer urgency read. */
+const ESCALATION: Array<[RegExp, Severity]> = [
+  [/\b(saans|breath|not breathing|pulse|cardiac|heart|dil|behosh|unconscious|bleed|khoon|drown)\b/i, 'CRITICAL'],
+  [/\b(fire|aag|smoke|collapse|gira|stuck|trap)\b/i, 'CRITICAL'],
+  [/\b(accident|crash|injur|fracture)\b/i, 'HIGH'],
+];
 
-export function newCase(id: string, callerPhrase: string, locationText: string): EmergencyCase {
-  const { incidentType, severity } = grade(callerPhrase, locationText);
-  const now = new Date().toISOString();
-  return {
-    id, createdAt: now, callerPhrase, incidentType, severity,
-    priority: PRIORITY[severity], locationText, status: 'TRIAGED',
-    assignedUnitId: null, dispatcherNote: '',
-    timeline: [{ kind: 'INTAKE', at: now, detail: `Graded ${severity} (${PRIORITY[severity]}) by local rules: ${incidentType}` }],
+export function gradeIntake(r: IntakeResult): { severity: Severity; priority: PriorityCode } {
+  let severity = URGENCY_SEVERITY[r.urgency] ?? 'UNKNOWN';
+  for (const [re, sev] of ESCALATION) {
+    if (re.test(`${r.emergencyType} ${r.location}`)) {
+      const order: Severity[] = ['UNKNOWN', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+      if (order.indexOf(sev) > order.indexOf(severity)) severity = sev;
+    }
+  }
+  const priority: Record<Severity, PriorityCode> = {
+    CRITICAL: 'P1', HIGH: 'P2', MEDIUM: 'P3', LOW: 'P4', UNKNOWN: 'P4',
   };
-}
-
-export function serviceFor(severity: Severity, incidentType: string): 'POLICE' | 'AMBULANCE' | 'FIRE' {
-  if (/fire/i.test(incidentType)) return 'FIRE';
-  if (/cardiac|accident|medical/i.test(incidentType)) return 'AMBULANCE';
-  return severity === 'CRITICAL' ? 'AMBULANCE' : 'POLICE';
+  return { severity, priority: priority[severity] };
 }

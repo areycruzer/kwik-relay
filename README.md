@@ -1,99 +1,93 @@
-# Kwik Relay — the outbound half of emergency dispatch
+# Kwik — emergency-call intake, practiced on real calls
 
-**A dispatcher console where CALL-E phone agents relay human-confirmed dispatch
-decisions to emergency response units — and bring back structured answers.**
+**The citizen's 112 call, made testable: a self-identifying AI intake agent
+that runs the practice call on a real phone line via CALL-E and returns the
+structured intake a control room would need.**
 
 Built for the [CALL-E: Your Code Is Calling hackathon](https://call-e.devpost.com).
-Independent synthetic demo — not an official 112 service.
+Independent demo — not an official 112 service.
 
 ## The problem this solves
 
-In a 112-style emergency control room, the inbound half is only half the job.
-After a case is graded and a dispatcher decides *"PCR Van 11 takes this"*, a
-human still has to **stop everything and phone the unit** — read out the
-location, ask if they can respond, note the ETA, and log it. That outbound leg
-is manual phone work: slow, untracked, and it scales badly on a busy night.
+When a citizen dials 112 in a panic, the quality of what the call-taker
+receives — what happened, where, how urgent — decides everything downstream.
+Today that skill is untestable: you cannot rehearse an emergency call, and
+agencies cannot train citizens or new call-takers against a real line without
+tying one up. Kwik turns that call into something you can practice and
+measure: an AI agent phones the participant, clearly identifies itself as a
+demo (never the real 112), runs the intake conversation in the participant's
+language, and returns structured data:
 
-Kwik Relay closes that loop with CALL-E:
-
+```json
+{
+  "emergency_type": "breathing emergency",
+  "location": "Shalimar Bagh B-block, Delhi",
+  "urgency": "critical",
+  "caller_clarity": "partial"
+}
 ```
-case graded → human dispatcher confirms unit (+ written note)
-           → CALL-E agent calls the unit (Hindi or English)
-           → structured result returns: unit_accepted (yes|no|unknown),
-             eta_minutes, notes, completion confidence
-           → result lands on the case timeline — auto-documented
-```
 
-The same pattern generalises to any workflow where *"someone has to stop what
-they're doing and make a phone call"*: clinic availability checks, repair
-services, school closures, field-staff escalations.
+Local deterministic rules then grade every intake into the severity/priority
+a control room would see — and the rules can only escalate, never downplay
+(life-critical words like "not breathing" grade CRITICAL regardless of a
+calmer agent read).
 
-## Safety design (the point of this project)
+## Why it's built this way (safety, discovered live)
 
-1. **The AI never decides.** A real relay call is impossible until a human
-   dispatcher records a dispatch decision with a written note. The constraint
-   is enforced server-side in the API route, not just the UI.
-2. **Relay, not command.** Every generated goal contains hard constraints:
-   *do not instruct, order, or pressure the unit to move; do not create or
-   change the dispatch decision; return "unknown" rather than guess.*
-3. **Tri-state results, always.** Real calls are unpredictable — the schema
-   is `yes | no | unknown`, so the console always receives a predictable
-   shape even when the line is bad or the answer is unclear.
-4. **Preview before every call.** PREVIEW mode builds the byte-identical
-   payload and shows it — no network, no call, fully inspectable. Safe to
-   try by anyone, including judges.
-5. **Full auditability.** The exact payload sent to CALL-E is stored on the
-   relay record and rendered on the case timeline, alongside the structured
-   result and confidence.
-6. **No secrets, no personal numbers.** API key lives server-side only;
-   unit numbers are masked placeholders configured via env; the units API
-   masks E.164 numbers in responses.
+While testing against production (2026-09-11) we found CALL-E's request
+safety layer **declines tasks involving emergency dispatch or
+emergency-service coordination** (HTTP 422 `call_not_ready`, verbatim:
+*"I can't place or plan calls involving emergency dispatch or
+emergency-service coordination… please revise the request to a non-emergency
+use case."*). We respect that boundary. The agent therefore never answers as,
+or speaks for, the 112 service:
+
+- **Self-identification first.** Every call opens with a clear statement, in
+  the participant's language, that this is an AI demonstration and NOT the
+  real 112.
+- **Real-emergency escape hatch.** If a participant indicates a real ongoing
+  emergency, the agent tells them to hang up and dial the real emergency
+  number immediately.
+- **Intake only.** The agent never dispatches anyone, never promises help is
+  coming, and never claims to be a government service.
+- **The agent's read is an input, never the verdict.** Severity comes from
+  local rules that can escalate but never downgrade.
 
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env      # add CALLE_API_KEY for real calls; preview works without it
-npm run dev               # http://localhost:3000
+cp .env.example .env   # set CALLE_API_KEY, DEMO_PIN, TESTER_NUMBER (E.164)
+npm run dev            # http://localhost:3000
 ```
 
-- Without `CALLE_API_KEY`: the console runs in **PREVIEW mode** — grade cases,
-  dispatch, inspect exact call payloads. No phone calls are possible.
-- With `CALLE_API_KEY` + your own phone number set for a unit (E.164, see
-  `.env.example`): the red **Place CALL-E relay** button makes a real call,
-  in Hindi (`hi`) or Indian English (`en-IN`) — first test on your own number,
-  exactly as CALL-E recommends.
+- **Preview mode** (no key needed): builds and displays the exact task —
+  no call placed, fully inspectable.
+- **Real mode**: with `CALLE_API_KEY` + `DEMO_PIN` + `TESTER_NUMBER` set, the
+  red button places one practice call to the tester phone (single attempt,
+  no redial), polls for completion, and grades the returned intake.
+
+## Review-policy compliance (live-capable demo tier)
+
+Per the `awesome-phone-call-agents` community review policy:
+
+| Requirement | How Kwik satisfies it |
+|---|---|
+| Explicit per-run operator intent | Confirm dialog + explicit Preview/Real buttons |
+| Basic authentication for remote real calling | Server-side `DEMO_PIN` (fail-closed without it) |
+| Authorized valid E.164 destinations | Single configured `TESTER_NUMBER` (the operator's own phone) |
+| Masked real phone numbers | Tester number masked in API and UI; env-only, never code |
+| No automatic redial after ambiguous outcomes | One call per click, one in flight, 6-call/10-min budget |
+| Stable intent/dedupe key | `Idempotency-Key: kwik-<practiceId>` on every create |
+| Honest cancellation limits | UI states a submitted call cannot be recalled |
 
 ## Run the tests
 
 ```bash
-npm test    # goal safety constraints, schema shape, E.164 validation, dry-run parity
+npm test   # self-ID lines, escape hatch, schema shape, grading escalation, preview parity
 ```
-
-## Repo layout
-
-- `lib/goals.ts` — goal + result-schema builder (the safety-critical core)
-- `lib/callee.ts` — the single place the CALL-E SDK is imported
-- `app/api/relay/route.ts` — relay lifecycle; enforces human-dispatch-before-call
-- `app/page.tsx` — dispatcher console (queue, decision, preview, results, timeline)
-- `skills/emergency-dispatch-relay/` — portable standalone skill (also submitted
-  as a PR to `awesome-phone-call-agents`)
-
-## Review-policy compliance (live-capable demo tier)
-
-Per the `awesome-phone-call-agents` community review policy for hackathon / live-capable demos:
-
-| Requirement | How Kwik Relay satisfies it |
-|---|---|
-| Explicit per-run operator intent | Confirm dialog + written dispatcher note + explicit Preview/Real buttons |
-| Basic authentication for remote real calling | Server-side `DEMO_PIN` (fail-closed: real calls are disabled, not open, without it) |
-| Authorized valid E.164 destinations | E.164 validation server-side; demo targets the operator's own phone |
-| Masked real phone numbers | Units API masks E.164; numbers live in env, never code |
-| No automatic redial after ambiguous outcomes | `policy.maxAttempts: 1`, `onNotReady: 'error'`, one-in-flight-per-case, rate budget |
-| Stable intent/dedupe key | `Idempotency-Key: kwik-relay-<relayId>` on every create |
-| Honest cancellation limits | UI states on confirm: a submitted call cannot be recalled; closing the page will not stop it |
 
 ## Stack
 
-Next.js 15 · React 19 · TypeScript · Tailwind 4 · `@call-e/calle` SDK ·
-node:test · MIT license.
+Next.js 15 · React 19 · TypeScript · Tailwind 4 · CALL-E REST API
+(`api.heycall-e.com/v1/calls`) · node:test · MIT license.
