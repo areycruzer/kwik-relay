@@ -167,7 +167,10 @@ export async function pollDemoCall(callId: string): Promise<CallePoll> {
   const status = typeof c.status === 'string' ? c.status : 'unknown';
   const recipients = Array.isArray(c.recipients) ? (c.recipients as Record<string, unknown>[]) : [];
   const r0 = recipients[0] ?? {};
-  const failureCode = (c.failure_code ?? r0.failure_code ?? null) as string | null;
+  // The concrete code often lives inside the first attempt (e.g. carrier "500").
+  const attempts = Array.isArray(r0.attempts) ? (r0.attempts as Record<string, unknown>[]) : [];
+  const a0 = attempts[0] ?? {};
+  const failureCode = (c.failure_code ?? r0.failure_code ?? a0.failure_code ?? null) as string | null;
   const phase: CallePhase =
     TERMINAL_BAD.has(status.toLowerCase()) || failureCode
       ? 'FAILED'
@@ -175,7 +178,7 @@ export async function pollDemoCall(callId: string): Promise<CallePoll> {
         ? 'DONE'
         : 'IN_FLIGHT';
   const structured = (c.structured_result ?? r0.structured_result ?? null) as unknown;
-  const summary = [r0.summary, c.summary]
+  const summary = [a0.summary, r0.summary, c.summary]
     .filter((x) => typeof x === 'string' && x.length)
     .join(' ') as string | null;
   return {
