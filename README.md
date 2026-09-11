@@ -18,6 +18,8 @@
 
 **One scripted caller can traverse voice intake, instant local grading, asynchronous refinement, and the dispatcher board without provider credentials.** Start the app locally, open [the local call station](http://localhost:3000/dashboard?startCall=1#voice-station), choose Ramesh, John, or Sharma ji, and play the scripted caller. The live demo call is placed through [CALL-E](https://heycall-e.com): one real outbound call to the configured tester phone, where the agent identifies itself as an AI demo (never the real 112), runs the intake in Hindi, and returns a structured intake that flows through the same triage pipeline. A Hume EVI browser session remains available as an optional code path.
 
+**Anyone can test the live demo call.** The demo PIN is public (`3053`). Leave the number field empty and the call goes to the configured demo phone — or enter your own E.164 number, tick the consent box (your number, or its owner agreed), and your phone rings: one call, single attempt, no redial, per-number cooldown, with the remaining live-call budget shown in the station. When CALL-E trial credits or the budget window run out, the scripted caller runs automatically with a notice — the identical triage pipeline, labeled SIMULATED.
+
 The station streams transcript turns, detected language, and MEASURED or SIMULATED prosody provenance. The board shows a rules grade while the call is active; call completion creates an incident immediately and then refines it in place when a model is configured.
 
 ## End-to-End Thinking
