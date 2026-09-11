@@ -79,6 +79,20 @@ npm test    # goal safety constraints, schema shape, E.164 validation, dry-run p
 - `skills/emergency-dispatch-relay/` — portable standalone skill (also submitted
   as a PR to `awesome-phone-call-agents`)
 
+## Review-policy compliance (live-capable demo tier)
+
+Per the `awesome-phone-call-agents` community review policy for hackathon / live-capable demos:
+
+| Requirement | How Kwik Relay satisfies it |
+|---|---|
+| Explicit per-run operator intent | Confirm dialog + written dispatcher note + explicit Preview/Real buttons |
+| Basic authentication for remote real calling | Server-side `DEMO_PIN` (fail-closed: real calls are disabled, not open, without it) |
+| Authorized valid E.164 destinations | E.164 validation server-side; demo targets the operator's own phone |
+| Masked real phone numbers | Units API masks E.164; numbers live in env, never code |
+| No automatic redial after ambiguous outcomes | `policy.maxAttempts: 1`, `onNotReady: 'error'`, one-in-flight-per-case, rate budget |
+| Stable intent/dedupe key | `Idempotency-Key: kwik-relay-<relayId>` on every create |
+| Honest cancellation limits | UI states on confirm: a submitted call cannot be recalled; closing the page will not stop it |
+
 ## Stack
 
 Next.js 15 · React 19 · TypeScript · Tailwind 4 · `@call-e/calle` SDK ·

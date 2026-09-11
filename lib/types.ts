@@ -5,8 +5,7 @@ export type PriorityCode = 'P1' | 'P2' | 'P3' | 'P4';
 
 export type CaseStatus =
   | 'TRIAGED'        // graded, awaiting human dispatch decision
-  | 'DISPATCHED'     // human confirmed a unit
-  | 'RELAYED'        // CALL-E call placed to the unit
+  | 'DISPATCHED'     // human confirmed a unit; relay call in flight
   | 'CONFIRMED'      // unit accepted (structured result: yes)
   | 'DECLINED'       // unit declined — dispatcher must pick another unit
   | 'CLOSED';
@@ -29,9 +28,9 @@ export type TimelineKind =
   | 'INTAKE'          // case graded by rules
   | 'DISPATCH'        // human decision recorded
   | 'RELAY_PREVIEW'   // dry-run payload inspected
-  | 'RELAY_CALL'      // real CALL-E call placed
+  | 'RELAY_CALL'      // real CALL-E call submitted (single attempt)
   | 'RELAY_RESULT'    // structured result received
-  | 'RELAY_CANCELED';
+  | 'RELAY_FAILED';
 
 export interface TimelineEntry {
   kind: TimelineKind;
@@ -50,11 +49,11 @@ export interface Unit {
 }
 
 export type RelayMode = 'PREVIEW' | 'REAL';
-export type RelayStatus = 'PLACING' | 'DONE' | 'FAILED' | 'CANCELED';
+export type RelayStatus = 'SUBMITTED' | 'DONE' | 'FAILED';
 
 export interface RelayResult {
   unitAccepted: 'yes' | 'no' | 'unknown';
-  etaMinutes: string;        // minutes or 'unknown'
+  etaMinutes: string;        // numeric string or 'unknown'
   notes: string;
 }
 
@@ -64,21 +63,32 @@ export interface RelayRecord {
   unitId: string;
   mode: RelayMode;
   status: RelayStatus;
-  payload: CallTaskPayload;  // exact task sent (or previewed) — full auditability
+  calleCallId: string | null; // provider call id, set the moment a real call is accepted
+  payload: CallTaskPayload;   // exact task submitted (or previewed) — full auditability
   result: RelayResult | null;
-  completionConfidence: number | null;
-  transcriptTurns: number | null;
-  error: string | null;
+  resultValidation: string | null;   // provider-side schema validation outcome
+  transcriptExcerpt: string | null;  // first lines of the provider transcript
+  failure: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 /** The exact CALL-E task payload we build. Kept as a plain serialisable object
- *  so PREVIEW mode can show precisely what REAL mode would send. */
+ *  so PREVIEW mode can show precisely what REAL mode would send. Mirrors the
+ *  SDK's CreateCallInput (task + recipient + resultSchema + policy). */
 export interface CallTaskPayload {
   task: string;              // English goal with safety constraints
-  phones: [string, ...string[]];
-  region: string;            // ISO 3166-1 alpha-2, e.g. 'IN'
-  locale: string;            // e.g. 'hi' — conversation language for the recipient
+  recipient: {
+    phone: string;           // E.164
+    region: string;          // ISO 3166-1 alpha-2, e.g. 'IN'
+    locale: string;          // conversation language for the recipient, e.g. 'hi'
+    name?: string;           // unit name, spoken naturally
+  };
   resultSchema: Record<string, { type: string; enum?: string[]; description: string }>;
+  policy: {
+    maxAttempts: 1;          // single attempt — no automatic redial (review policy)
+    voicemail: 'do_not_leave';
+    onNotReady: 'error';     // surface failures; never silently retry
+  };
   metadata: { caseId: string; unitId: string; relayId: string; product: 'kwik-relay' };
 }
