@@ -7,8 +7,7 @@
 
 **AI middleware for India's 112 emergency line, and the phone call is real: CALL-E places it.**
 
-[![Tests](https://img.shields.io/badge/tests-264%20passing-brightgreen)](https://github.com/areycruzer/kwik-relay/actions)
-[![CI](https://img.shields.io/badge/CI-critical%20recall%20gate%20%3D%201.0-blue)](.github/workflows/ci.yml)
+[![CI](https://github.com/areycruzer/kwik-relay/actions/workflows/ci.yml/badge.svg)](https://github.com/areycruzer/kwik-relay/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black)](LICENSE)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org)
 [![React 19](https://img.shields.io/badge/React-19-black)](https://react.dev)
