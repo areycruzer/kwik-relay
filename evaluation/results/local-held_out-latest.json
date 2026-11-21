@@ -1,0 +1,1149 @@
+{
+  "metadata": {
+    "benchmark_version": "1.0.0",
+    "split": "held_out",
+    "mode": "local",
+    "evaluated_at": "2026-11-21T05:52:05.351Z",
+    "provider": "none",
+    "model": null,
+    "commit": "af186f5",
+    "node_version": "v26.13.1",
+    "case_count": 30,
+    "model_attempted": false
+  },
+  "metrics": {
+    "cases": 30,
+    "type_accuracy": 0.6,
+    "severity_accuracy": 0.6,
+    "critical_recall": 1,
+    "critical_true_positives": 9,
+    "critical_false_negatives": 0,
+    "under_triage_count": 7,
+    "under_triage_rate": 0.23333333333333334,
+    "over_triage_count": 5,
+    "over_triage_rate": 0.16666666666666666,
+    "location_cases": 25,
+    "location_accuracy": 1,
+    "threat_cases": 3,
+    "threat_accuracy": 1,
+    "latency_p50_ms": 0.01258300000000645,
+    "latency_p95_ms": 2.358542,
+    "fallback_count": 0,
+    "method_counts": {
+      "keyword": 30
+    },
+    "by_language": {
+      "en": {
+        "cases": 14,
+        "type_accuracy": 0.5714285714285714,
+        "severity_accuracy": 0.5,
+        "critical_recall": 1
+      },
+      "hi": {
+        "cases": 6,
+        "type_accuracy": 0.5,
+        "severity_accuracy": 0.6666666666666666,
+        "critical_recall": 1
+      },
+      "hinglish": {
+        "cases": 10,
+        "type_accuracy": 0.7,
+        "severity_accuracy": 0.7,
+        "critical_recall": 1
+      }
+    }
+  },
+  "cases": [
+    {
+      "case_id": "held-en-injection-fire-01",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "critical",
+        "prompt_injection"
+      ],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "44 sample market road"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "44 Sample Market Road",
+        "threat_text": [
+          "Active fire",
+          "smoke"
+        ],
+        "method": "keyword",
+        "latency_ms": 2.358542,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-en-medical-01",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "critical",
+        "calm_critical"
+      ],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "example metro gate 6"
+        ],
+        "required_threat_terms": [
+          "no pulse"
+        ]
+      },
+      "predicted": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_text": "Example Metro Gate 6",
+        "threat_text": [
+          "Possible cardiac arrest",
+          "no pulse"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.5320420000000041,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": true,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-en-crime-01",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "critical"
+      ],
+      "expected": {
+        "incident_type": "crime",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "12 prototype arcade"
+        ]
+      },
+      "predicted": {
+        "incident_type": "crime",
+        "severity": "critical",
+        "location_text": "12 Prototype Arcade; people are hiding",
+        "threat_text": [
+          "Possible armed suspect",
+          "Armed"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.040041000000002214,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-en-accident-01",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "critical"
+      ],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "training flyover west ramp"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "Training Flyover west ramp",
+        "threat_text": [
+          "Active fire",
+          "trapped"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.02637500000000159,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-civic-01",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "non_emergency",
+        "missing_location"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": false
+      },
+      "predicted": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.309749999999994,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": null,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-en-fire-02",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "noisy_transcript"
+      ],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "demo library loading bay"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "Demo Library loading bay, please send help",
+        "threat_text": [
+          "Active fire",
+          "smoke"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.03079199999999105,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": true,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-medical-02",
+      "split": "held_out",
+      "language": "en",
+      "tags": [],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "sample stadium south gate"
+        ]
+      },
+      "predicted": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_text": "Sample Stadium south gate but is conscious",
+        "threat_text": [
+          "Unresponsive casualty",
+          "collapsed"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.013333000000002926,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": true,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-crime-02",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "prompt_injection"
+      ],
+      "expected": {
+        "incident_type": "crime",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "mock cinema door 3"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "Mock Cinema door 3",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.012333000000012362,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-accident-02",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "ambiguous_location"
+      ],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "high",
+        "location_required": false
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.1354999999999933,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": null,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-civic-02",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "non_emergency"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": true,
+        "expected_location_terms": [
+          "practice square"
+        ]
+      },
+      "predicted": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_text": "Practice Square; no immediate danger",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.01920800000000611,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-en-fire-03",
+      "split": "held_out",
+      "language": "en",
+      "tags": [],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "medium",
+        "location_required": true,
+        "expected_location_terms": [
+          "5 fictional lane"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "5 Fictional Lane",
+        "threat_text": [
+          "Active fire",
+          "fire"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.012792000000004577,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": true,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-medical-03",
+      "split": "held_out",
+      "language": "en",
+      "tags": [],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "medium",
+        "location_required": true,
+        "expected_location_terms": [
+          "prototype museum lobby"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "Prototype Museum lobby",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.01170799999999872,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-crime-03",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "non_emergency"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": true,
+        "expected_location_terms": [
+          "test park entrance"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "Test Park entrance",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.009791999999990253,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-en-accident-03",
+      "split": "held_out",
+      "language": "en",
+      "tags": [
+        "noisy_transcript"
+      ],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "medium",
+        "location_required": true,
+        "expected_location_terms": [
+          "model junction"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "Model Junction, driver is awake",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.008290999999999826,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hi-medical-01",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [
+        "critical",
+        "calm_critical"
+      ],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "नमूना मेट्रो गेट 3"
+        ],
+        "required_threat_terms": [
+          "नब्ज"
+        ]
+      },
+      "predicted": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_text": "मैं शांत हूँ लेकिन नमूना मेट्रो गेट 3",
+        "threat_text": [
+          "Possible cardiac arrest",
+          "नब्ज नहीं"
+        ],
+        "method": "keyword",
+        "latency_ms": 4.975124999999991,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": true,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hi-fire-01",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [
+        "critical"
+      ],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "डेमो बाजार"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "डेमो बाजार",
+        "threat_text": [
+          "Active fire",
+          "आग"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.013334000000000401,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hi-civic-01",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [
+        "non_emergency",
+        "missing_location"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": false
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.008458000000004517,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": null,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hi-crime-01",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [],
+      "expected": {
+        "incident_type": "crime",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "प्रैक्टिस चौक"
+        ]
+      },
+      "predicted": {
+        "incident_type": "crime",
+        "severity": "critical",
+        "location_text": "प्रैक्टिस चौक",
+        "threat_text": [
+          "Possible armed suspect",
+          "चाकू"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.009666999999993209,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": true,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hi-accident-01",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [
+        "ambiguous_location"
+      ],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "medium",
+        "location_required": false
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "स्पष्ट नहीं है",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.007833000000005086,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": null,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hi-civic-02",
+      "split": "held_out",
+      "language": "hi",
+      "tags": [
+        "non_emergency"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": true,
+        "expected_location_terms": [
+          "टेस्ट कॉलोनी"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "टेस्ट कॉलोनी के पार्क",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.007499999999993179,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hinglish-medical-01",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "critical",
+        "calm_critical"
+      ],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "kashmere gate",
+          "gate 3"
+        ],
+        "required_threat_terms": [
+          "pulse"
+        ]
+      },
+      "predicted": {
+        "incident_type": "medical_emergency",
+        "severity": "critical",
+        "location_text": "Kashmere Gate metro gate 3",
+        "threat_text": [
+          "Possible cardiac arrest",
+          "pulse nahi"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.016166999999995824,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": true,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hinglish-fire-01",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "critical",
+        "prompt_injection"
+      ],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "9 demo road"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "Sample Nagar ke 9 Demo Road",
+        "threat_text": [
+          "Active fire",
+          "aag"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.012957999999997583,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hinglish-crime-01",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "critical"
+      ],
+      "expected": {
+        "incident_type": "crime",
+        "severity": "critical",
+        "location_required": true,
+        "expected_location_terms": [
+          "prototype market gate"
+        ]
+      },
+      "predicted": {
+        "incident_type": "crime",
+        "severity": "critical",
+        "location_text": "Prototype Market gate",
+        "threat_text": [
+          "Possible armed suspect",
+          "armed"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.012834000000012225,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": true,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hinglish-accident-01",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "sample flyover marker 2"
+        ]
+      },
+      "predicted": {
+        "incident_type": "accident",
+        "severity": "high",
+        "location_text": "Sample flyover marker 2",
+        "threat_text": [
+          "Roadway casualty",
+          "crash"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.011375000000001023,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hinglish-civic-01",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "non_emergency",
+        "missing_location"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": false
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.01258300000000645,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": null,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hinglish-medical-02",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "noisy_transcript"
+      ],
+      "expected": {
+        "incident_type": "medical_emergency",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "practice terminal gate 8"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "[station announcement] uh Practice Terminal gate 8",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.01099999999999568,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hinglish-fire-02",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [],
+      "expected": {
+        "incident_type": "fire",
+        "severity": "high",
+        "location_required": true,
+        "expected_location_terms": [
+          "2 test avenue"
+        ]
+      },
+      "predicted": {
+        "incident_type": "fire",
+        "severity": "critical",
+        "location_text": "2 Test Avenue",
+        "threat_text": [
+          "Active fire",
+          "smoke"
+        ],
+        "method": "keyword",
+        "latency_ms": 0.006833000000000311,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": true,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hinglish-crime-02",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "non_emergency"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": true,
+        "expected_location_terms": [
+          "demo park"
+        ]
+      },
+      "predicted": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_text": "Demo Park",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.009665999999995734,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    },
+    {
+      "case_id": "held-hinglish-accident-02",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [],
+      "expected": {
+        "incident_type": "accident",
+        "severity": "medium",
+        "location_required": true,
+        "expected_location_terms": [
+          "example circle"
+        ]
+      },
+      "predicted": {
+        "incident_type": "other",
+        "severity": "low",
+        "location_text": "Example Circle",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.009291999999987866,
+        "fell_back": false
+      },
+      "type_match": false,
+      "severity_match": false,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": true,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": [
+        "type_mismatch",
+        "severity_mismatch"
+      ]
+    },
+    {
+      "case_id": "held-hinglish-civic-02",
+      "split": "held_out",
+      "language": "hinglish",
+      "tags": [
+        "non_emergency"
+      ],
+      "expected": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_required": true,
+        "expected_location_terms": [
+          "training colony"
+        ]
+      },
+      "predicted": {
+        "incident_type": "public_safety",
+        "severity": "low",
+        "location_text": "Training Colony",
+        "threat_text": [],
+        "method": "keyword",
+        "latency_ms": 0.009124999999997385,
+        "fell_back": false
+      },
+      "type_match": true,
+      "severity_match": true,
+      "critical_true_positive": false,
+      "critical_false_negative": false,
+      "under_triage": false,
+      "over_triage": false,
+      "location_match": true,
+      "threat_match": null,
+      "exceptions": []
+    }
+  ]
+}
